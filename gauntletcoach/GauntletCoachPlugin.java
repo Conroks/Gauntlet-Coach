@@ -3,6 +3,7 @@ package net.runelite.client.plugins.gauntletcoach;
 import javax.inject.Inject;
 import net.runelite.api.Client;
 import net.runelite.api.NPC;
+import net.runelite.api.events.NpcDespawned;
 import net.runelite.api.events.NpcSpawned;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
@@ -24,8 +25,8 @@ public class GauntletCoachPlugin extends Plugin {
     private Client client;
     //initializes the set of relevant npc id's
     private static final Set<Integer> HUNLLEF_IDS = Set.of(
-            9021, // Crystal Hunllef ID
-            9035, 9036, 9037  // Corrupted Hunllef ID
+            9021, 9022, 9023, 9024, // Crystal Hunllef ID
+            9035, 9036, 9037, 9038  // Corrupted Hunllef ID
     );
 
     private static final Set<Integer> TORNADO_IDS = Set.of(
@@ -45,7 +46,7 @@ public class GauntletCoachPlugin extends Plugin {
     /* Relevant asset ID tracking
     ~~~~~~~~~~~~~~Gauntlet~~~~~~~~~~~~~~~
 
-    Hunllef Id: 9021
+    Hunllef Id: 9021/9022/9023/9024
     Hunllef Tornados: 9025
     Crystal Rat: 9026
     Crystal Bat: 9028
@@ -59,7 +60,7 @@ public class GauntletCoachPlugin extends Plugin {
 
     ~~~~~~~~~~~Corrupted Gauntlet~~~~~~~~~~~~~
 
-    Corrupted Hunllef Id: 9035/9036/9037
+    Corrupted Hunllef Id: 9035/9036/9037/9038
     Hunllef Tornados : 9039
     Corrupted Rat: 9040
     Corrupted Bat: 9042
@@ -77,9 +78,11 @@ public class GauntletCoachPlugin extends Plugin {
              Hunllef Melee attack:8420
              Hunllef Ranged to Mage swap animation: 8754
              Hunllef Mage to Ranged swap animation: 8755
+             Summon tornados animation:8418
         */
 
     private int hunllefDamageDealt = 0;
+    private int hunllefMeleeDamageDealt = 0;
     private int hunllefDamageReceived = 0;
     private int hunllefAttackCount = 0;
 
@@ -89,6 +92,7 @@ public class GauntletCoachPlugin extends Plugin {
 
     private enum HunllefStyle {MAGE,RANGED,MELEE}
     private HunllefStyle currentHunllefStyle = HunllefStyle.RANGED;
+    private HunllefStyle lastAttackStyle = HunllefStyle.RANGED;
     private boolean lastAttackOnPrayer = false;
 
     private static final int hunllefAttackAnimation = 8419;
@@ -103,12 +107,22 @@ public class GauntletCoachPlugin extends Plugin {
     @Override
     protected void startUp() {
         hunllefDamageDealt = 0;
+        hunllefMeleeDamageDealt = 0;
         hunllefDamageReceived = 0;
         hunllefAttackCount = 0;
+
+        hunllefDamageReceivedOnPrayer = 0;
+        hunllefDamageReceivedOffPrayer = 0;
+
         minionDamageDealt = 0;
         minionDamageReceived = 0;
         minionAttackCount = 0;
-        System.out.println("Gauntlet Coach started");
+
+
+        currentHunllefStyle = HunllefStyle.RANGED;
+        lastAttackOnPrayer = false;
+
+        System.out.println("~~~~~~~Gauntlet Coach started~~~~~~~");
     }
 
     @Override
@@ -142,6 +156,14 @@ public class GauntletCoachPlugin extends Plugin {
         Hitsplat hitsplat = event.getHitsplat();
 
         if(actor == client.getLocalPlayer()) {
+
+            hunllefDamageReceived += hitsplat.getAmount();
+
+            if(lastAttackStyle == HunllefStyle.MELEE)
+            {
+                hunllefMeleeDamageDealt += hitsplat.getAmount();
+            }
+
             if(lastAttackOnPrayer) {
                 hunllefDamageReceivedOnPrayer += hitsplat.getAmount();
                 System.out.println("Damage received ON correct prayer: " + hitsplat.getAmount());
@@ -178,6 +200,7 @@ public class GauntletCoachPlugin extends Plugin {
             onPrayer = client.isPrayerActive(Prayer.PROTECT_FROM_MELEE);
         }
 
+        lastAttackStyle = style;
         lastAttackOnPrayer = onPrayer;
         hunllefAttackCount++;
 
@@ -203,18 +226,63 @@ public class GauntletCoachPlugin extends Plugin {
             currentHunllefStyle = HunllefStyle.MAGE;
             System.out.println("Hunllef swapped to MAGE");
         } else if (animID == hunllefMeleeAttackAnimation) {
-            //checkHunllefAttack(HunllefStyle.MELEE);
+            checkHunllefAttack(HunllefStyle.MELEE);
             System.out.println("Hunllef hit with MELEE");
         } else if (animID == hunllefAttackAnimation) {
             checkHunllefAttack(currentHunllefStyle);
         }
-/*
+
         //Outputs animation change details to terminal ~~~~DEBUGGING + INFO GATHERING
-        System.out.println(
-                "NPC Animation: " + npc.getName() +
-                " AnimID: " + npc.getAnimation()
-        );
-*/
+//        System.out.println(
+//                "NPC Animation: " + npc.getName() +
+//                " AnimID: " + npc.getAnimation()
+//        );
+
+    }
+    @Subscribe
+    public void onNpcDespawned(NpcDespawned event)
+    {
+        NPC npc = event.getNpc();
+
+        if (HUNLLEF_IDS.contains(npc.getId()))
+        {
+            outputResults();
+            resetEncounter();
+        }
+    }
+
+    private void outputResults()
+    {
+        System.out.println("~~~~~~~~~~~~~~GAUNTLET COMPLETED~~~~~~~~~~~~~~");
+        System.out.println("Total Damage Received: " + hunllefDamageDealt);
+        System.out.println("Total Melee Damage Received: " + hunllefMeleeDamageDealt);
+        System.out.println("Total Damage Dealt: " + hunllefDamageReceived);
+        System.out.println("Total Attacks: " + hunllefAttackCount);
+        System.out.println("Total Damage Received OFF Prayer: " + hunllefDamageReceivedOffPrayer);
+        System.out.println("Total Damage Received ON Prayer: " + hunllefDamageReceivedOnPrayer);
+        System.out.println("Total Minion Damage Received: " + minionDamageDealt);
+        System.out.println("Total Minion Damage Dealt: " + minionDamageReceived);
+
+    }
+
+    private void resetEncounter()
+    {
+        hunllefDamageDealt = 0;
+        hunllefMeleeDamageDealt = 0;
+        hunllefDamageReceived = 0;
+        hunllefAttackCount = 0;
+
+        minionDamageDealt = 0;
+        minionAttackCount = 0;
+        minionDamageReceived = 0;
+
+        hunllefDamageReceivedOnPrayer = 0;
+        hunllefDamageReceivedOffPrayer = 0;
+
+        currentHunllefStyle = HunllefStyle.RANGED;
+        lastAttackOnPrayer = false;
+
+        System.out.println("Gauntlet plugin reset");
 
     }
 }
