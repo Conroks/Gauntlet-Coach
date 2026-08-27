@@ -1,4 +1,4 @@
-package net.runelite.client.plugins.gauntletcoach;
+package com.gauntletcoach;
 
 
 import net.runelite.client.config.Config;
