@@ -1,210 +1,81 @@
-# \# Gauntlet Coach
+# Gauntlet Coach
 
-# 
+A RuneLite plugin that provides **post-fight analytics and coaching for the Gauntlet and Corrupted Gauntlet (CG)** in Old School RuneScape.
 
-# \*\*Old School RuneScape RuneLite plugin for Gauntlet/Corrupted Gauntlet data tracking and coaching.\*\*
+Gauntlet Coach analyzes your Hunllef encounter to show what went wrong, where damage could have been avoided, and where you can improve — turning each attempt into actionable feedback.
 
-# 
+## Features
 
-# Gauntlet Coach is a RuneLite plugin designed to help players learn and improve at the \*\*Gauntlet\*\* and \*\*Corrupted Gauntlet (CG)\*\* in Old School RuneScape.
+* Fight duration and average DPS
+* Damage dealt and received
+* On-prayer vs. off-prayer damage
+* Incorrect prayer hits
+* Melee and avoidable damage
+* Hunllef attack tracking
+* Minion damage and attack tracking
 
-# 
+Supports both **regular and Corrupted Gauntlet**.
 
-# Rather than simply tracking whether a player completes the encounter, Gauntlet Coach analyzes the Hunllef fight and provides post-fight performance metrics to help identify mistakes and areas for improvement.
+## How It Works
 
-# 
+Gauntlet Coach monitors combat events during the Hunllef encounter using RuneLite's event system. Once the fight ends, the collected data is used to generate a performance breakdown in the Gauntlet Coach sidebar panel.
 
-# The goal is to make learning the Gauntlet less about guessing what went wrong and more about understanding exactly where damage, missed prayers, positioning mistakes, and other inefficiencies occurred.
+The plugin is designed as a **learning tool** — it analyzes your performance rather than playing or solving the encounter for you.
 
-# 
+## Future Plans
 
-# \## Features
+The long-term goal is to expand Gauntlet Coach beyond the Gauntlet into a broader **PvM coaching system** used to create a profile on a player's broader PvM performance, analyzing a players strengths and weak points across multiple bosses.
+This profile can be used to identify recurring weaknesses and make personalized coaching suggestions and provide a roadmap or bossing ladder to develop the player's specific skill set.
 
-# 
 
-# Gauntlet Coach tracks combat data throughout the Hunllef encounter and presents a post-fight breakdown of the player's performance.
+## Development Reference
 
-# 
+<details>
+<summary><b>NPC IDs</b></summary>
 
-# Current tracking includes:
+### Gauntlet
 
-# 
+```text id="rd4gve"
+Hunllef:            9021 / 9022 / 9023 / 9024
+Tornado:            9025
+Crystal Rat:        9026
+Crystal Spider:     9027
+Crystal Bat:        9028
+Crystal Unicorn:    9029
+Crystal Scorpion:   9030
+Crystal Wolf:       9031
+Crystal Bear:       9032
+Crystal Dragon:     9033
+Crystal Dark Beast: 9034
+```
 
-# \* Fight duration
+### Corrupted Gauntlet
 
-# \* Total damage dealt
+```text id="gv74vc"
+Corrupted Hunllef:  9035 / 9036 / 9037 / 9038
+Tornado:            9039
+Corrupted Rat:      9040
+Corrupted Spider:   9041
+Corrupted Bat:      9042
+Corrupted Unicorn:  9043
+Corrupted Scorpion: 9044
+Corrupted Wolf:     9045
+Corrupted Bear:     9046
+Corrupted Dragon:   9047
+Corrupted Dark Beast: 9048
+```
 
-# \* Average DPS
+</details>
 
-# \* Total damage received
+<details>
+<summary><b>Animation IDs</b></summary>
 
-# \* Damage received while correctly praying
+```text id="xssb3p"
+Hunllef Attack:                  8419
+Hunllef Melee Attack:            8420
+Ranged → Mage Swap:              8754
+Mage → Ranged Swap:              8755
+Summon Tornadoes:                8418
+```
 
-# \* Damage received while incorrectly praying
-
-# \* Incorrect prayer hits
-
-# \* Melee damage received
-
-# \* Avoidable damage
-
-# \* Percentage of damage received off-prayer
-
-# \* Hunllef attack tracking
-
-# \* Minion damage dealt
-
-# \* Minion damage received
-
-# \* Minion attack tracking
-
-# 
-
-# The plugin supports both the \*\*regular Gauntlet\*\* and \*\*Corrupted Gauntlet\*\* encounters.
-
-# 
-
-# \## How It Works
-
-# 
-
-# Gauntlet Coach monitors the Hunllef encounter through RuneLite's event system.
-
-# 
-
-# During the fight, the plugin tracks combat events such as NPC attacks, hitsplats, prayer state, damage sources, and encounter timing.
-
-# 
-
-# Once the encounter ends, the collected data is used to provide a performance breakdown that can help the player understand what happened during the fight and where they can improve.
-
-# 
-
-# The plugin is intended as a \*\*learning and coaching tool\*\*, rather than an automation tool. It does not play the encounter for the user.
-
-# 
-
-# \## Gauntlet Coach Panel
-
-# 
-
-# Gauntlet Coach adds a dedicated panel to the RuneLite sidebar.
-
-# 
-
-# The panel is used to display encounter information and coaching data collected by the plugin.
-
-# 
-
-# Future development will continue expanding the panel with more detailed post-fight analysis and actionable coaching feedback.
-
-# 
-
-# Longer term, I would like to expand Gauntlet Coach beyond the Gauntlet to support additional bosses. The goal is to build a broader PvM coaching profile that can identify a player's weaknesses across multiple encounters, make personalized suggestions, and eventually provide a bossing roadmap or progression ladder focused on developing the player's specific skill set.
-
-# 
-
-# \---
-
-# 
-
-# \## Development Notes
-
-# 
-
-# The following IDs are retained as a reference for development and encounter tracking.
-
-# 
-
-# \### Relevant Asset IDs
-
-# 
-
-# \#### Gauntlet
-
-# 
-
-# | NPC                |                        ID |
-
-# | ------------------ | ------------------------: |
-
-# | Hunllef            | 9021 / 9022 / 9023 / 9024 |
-
-# | Hunllef Tornado    |                      9025 |
-
-# | Crystal Rat        |                      9026 |
-
-# | Crystal Spider     |                      9027 |
-
-# | Crystal Bat        |                      9028 |
-
-# | Crystal Unicorn    |                      9029 |
-
-# | Crystal Scorpion   |                      9030 |
-
-# | Crystal Wolf       |                      9031 |
-
-# | Crystal Bear       |                      9032 |
-
-# | Crystal Dragon     |                      9033 |
-
-# | Crystal Dark Beast |                      9034 |
-
-# 
-
-# \#### Corrupted Gauntlet
-
-# 
-
-# | NPC                  |                        ID |
-
-# | -------------------- | ------------------------: |
-
-# | Corrupted Hunllef    | 9035 / 9036 / 9037 / 9038 |
-
-# | Hunllef Tornado      |                      9039 |
-
-# | Corrupted Rat        |                      9040 |
-
-# | Corrupted Spider     |                      9041 |
-
-# | Corrupted Bat        |                      9042 |
-
-# | Corrupted Unicorn    |                      9043 |
-
-# | Corrupted Scorpion   |                      9044 |
-
-# | Corrupted Wolf       |                      9045 |
-
-# | Corrupted Bear       |                      9046 |
-
-# | Corrupted Dragon     |                      9047 |
-
-# | Corrupted Dark Beast |                      9048 |
-
-# 
-
-# \### Animation IDs
-
-# 
-
-# \#### Hunllef
-
-# 
-
-# | Animation          |   ID |
-
-# | ------------------ | ---: |
-
-# | Standard attack    | 8419 |
-
-# | Melee attack       | 8420 |
-
-# | Ranged → Mage swap | 8754 |
-
-# | Mage → Ranged swap | 8755 |
-
-# | Summon tornadoes   | 8418 |
-
-
-
+</details>
