@@ -84,23 +84,9 @@ public class GauntletCoachPlugin extends Plugin {
     //Initialize the plugin
     @Override
     protected void startUp() {
-        hunllefDamageReceived = 0;
-        hunllefMeleeDamageReceived = 0;
-        hunllefDamageDealt = 0;
-        hunllefAttackCount = 0;
 
-        hunllefDamageReceivedOnPrayer = 0;
-        hunllefDamageReceivedOffPrayer = 0;
+        resetEncounter();
 
-        minionDamageDealt = 0;
-        minionDamageReceived = 0;
-        minionAttackCount = 0;
-
-        currentHunllefStyle = HunllefStyle.RANGED;
-        lastAttackOnPrayer = false;
-        incorrectPrayerHits = 0;
-        pendingDamageSource = DamageSource.UNKNOWN;
-        pendingDamageTick = -1;
 
         final BufferedImage gcIcon = ImageUtil.loadImageResource(getClass(), "gcIcon.png");
 
@@ -119,7 +105,13 @@ public class GauntletCoachPlugin extends Plugin {
 
     @Override
     protected void shutDown() {
-        System.out.println("Gauntlet Coach stopped");
+
+        if(gcButton != null) {
+            gauntletCoachToolbar.removeNavigation(gcButton);
+            gcButton = null;
+        }
+
+        resetEncounter();
     }
 
     //When NPCs are rendered in, reports the NPC Id number to the terminal
