@@ -9,6 +9,7 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 
 import java.awt.image.BufferedImage;
+import java.util.HashSet;
 import java.util.Set;
 import net.runelite.client.config.ConfigManager;
 import com.google.inject.Provides;
@@ -16,8 +17,7 @@ import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.util.ImageUtil;
 
-@PluginDescriptor(
-        name = "Gauntlet Coach")
+@PluginDescriptor(name = "Gauntlet Coach")
 
 public class GauntletCoachPlugin extends Plugin {
     @Inject
@@ -32,6 +32,8 @@ public class GauntletCoachPlugin extends Plugin {
             9025, //Regular Gauntlet
             9039  //Corrupted Gauntlet
     );
+
+    private final Set<NPC> activeTornadoes = new HashSet<>();
 
     private static final Set<Integer> MINION_IDS = Set.of(
             9026, 9027, 9028, 9029, 9030, 9031, 9032, 9033, 9034, //Regular Gauntlet
@@ -63,10 +65,19 @@ public class GauntletCoachPlugin extends Plugin {
     private HunllefStyle currentHunllefStyle = HunllefStyle.RANGED;
     private HunllefStyle lastAttackStyle = HunllefStyle.RANGED;
     private boolean lastAttackOnPrayer = false;
+    private boolean waitingForPrayerCorrection = false;
+    private HunllefStyle expectedPrayerStyle = null;
+    private int hunllefStyleSwapTick = -1;
+
+    private int totalPrayerReactionTicks = 0;
+    private int prayerSwitchCount = 0;
+    private int fastestPrayerReaction = Integer.MAX_VALUE;
+    private int slowestPrayerReaction = -1;
+
 
     private enum DamageSource {HUNLLEF, TORNADO, MINION, FLOOR, UNKNOWN}
     private DamageSource pendingDamageSource = DamageSource.UNKNOWN;
-    private int pendingDamageTick = -1;
+    private int pendingHunllefAttackTick = -1;
 
     private static final int hunllefAttackAnimation = 8419;
     private static final int hunllefMageSwitchAnimation = 8754;
@@ -86,7 +97,6 @@ public class GauntletCoachPlugin extends Plugin {
     protected void startUp() {
 
         resetEncounter();
-
 
         final BufferedImage gcIcon = ImageUtil.loadImageResource(getClass(), "gcIcon.png");
 
@@ -119,12 +129,12 @@ public class GauntletCoachPlugin extends Plugin {
     public void onNpcSpawned(NpcSpawned event) {
         NPC npc = event.getNpc();
 
-        System.out.println(
-                "NPC Spawned: " +
-                        npc.getName() +
-                        " ID: " +
-                        npc.getId()
-        );
+        if (TORNADO_IDS.contains(npc.getId())) {
+            activeTornadoes.add(npc);
+
+            System.out.println("Tornado spawned. ActiveTornadoes: " + activeTornadoes.size());
+        }
+
     }
 
     //Connects config file
@@ -134,23 +144,78 @@ public class GauntletCoachPlugin extends Plugin {
     }
 
     @Subscribe
-    public void onGameTick(GameTick event)
-    {
-        if (pendingDamageSource !=DamageSource.HUNLLEF) {
-            return;
+    public void onGameTick(GameTick event) {
+        int currentTick = client.getTickCount();
+        int prayerReactionTicks = -1;
+
+        if (pendingHunllefAttackTick !=-1) {
+
+            int attackAge = currentTick - pendingHunllefAttackTick;
+
+            if (attackAge > HUNLLEF_DAMAGE_WINDOW) {
+                pendingHunllefAttackTick = -1;
+            }
         }
 
 
+        //Checks each tick after Hunllef switches his damage type for the player's Prayer Reaction
+        if (waitingForPrayerCorrection){
+            if (isCorrectPrayerActive(expectedPrayerStyle)){
+                prayerReactionTicks = currentTick - hunllefStyleSwapTick ;
+                waitingForPrayerCorrection = false;
+                System.out.println("Prayer reation time: "  + prayerReactionTicks + " ticks.");
+                totalPrayerReactionTicks += prayerReactionTicks;
 
-        int currentTick = client.getTickCount();
-        int attackAge = currentTick - pendingDamageTick;
+                if(prayerReactionTicks < fastestPrayerReaction) {
+                    fastestPrayerReaction = prayerReactionTicks;
+                }
 
-        if (attackAge > HUNLLEF_DAMAGE_WINDOW)
-        {
-            pendingDamageSource = DamageSource.UNKNOWN;
-            pendingDamageTick = -1;
+                if(prayerReactionTicks > slowestPrayerReaction) {
+                    slowestPrayerReaction = prayerReactionTicks;
+                }
+                prayerSwitchCount++;
+                prayerReactionTicks = -1;
+            }
         }
     }
+
+    private DamageSource resolveDamageSource(int currentTick){
+        if (pendingHunllefAttackTick !=1) {
+            int attackAge = currentTick - pendingHunllefAttackTick;
+
+            if(attackAge <= HUNLLEF_DAMAGE_WINDOW){
+                return DamageSource.HUNLLEF;
+            }
+        }
+        return DamageSource.UNKNOWN;
+    }
+
+    private boolean isCorrectPrayerActive(HunllefStyle style){
+        if(style == HunllefStyle.RANGED) {
+            return client.isPrayerActive(Prayer.PROTECT_FROM_MISSILES);
+        } else if (style == HunllefStyle.MAGE) {
+            return client.isPrayerActive(Prayer.PROTECT_FROM_MAGIC);
+        } else if (style == HunllefStyle.MELEE){
+             return client.isPrayerActive(Prayer.PROTECT_FROM_MELEE);
+        }
+        return false;
+    }
+
+    private int getTornadoesOnPlayer(){
+        Player player = client.getLocalPlayer();
+        if(player == null){
+            return 0;
+        }
+        int tornadoesOnPlayer = 0;
+
+        for(NPC tornado : activeTornadoes) {
+            if (tornado.getWorldLocation().equals(player.getWorldLocation())){
+                tornadoesOnPlayer++;
+            }
+        }
+        return tornadoesOnPlayer;
+    }
+
 
     //Checks players Prayer against hunllef's current attack and outputs
     private void checkHunllefAttack(HunllefStyle style) {
@@ -172,8 +237,7 @@ public class GauntletCoachPlugin extends Plugin {
         lastAttackOnPrayer = onPrayer;
         hunllefAttackCount++;
         pendingDamageSource = DamageSource.HUNLLEF;
-        pendingDamageTick = client.getTickCount();
-
+        pendingHunllefAttackTick = client.getTickCount();
         System.out.println("Hunllef attacked with " + style + " ~ Player on prayer: " + onPrayer);
 
     }
@@ -184,12 +248,14 @@ public class GauntletCoachPlugin extends Plugin {
         Actor actor = event.getActor();
         Hitsplat hitsplat = event.getHitsplat();
 
+        //Checks damage hunllef has done to player
         if(actor == client.getLocalPlayer()) {
 
-            if(pendingDamageSource == DamageSource.HUNLLEF) {
+            DamageSource damageSource = resolveDamageSource(client.getTickCount());
+
+            if(damageSource == DamageSource.HUNLLEF) {
 
                 hunllefDamageReceived += hitsplat.getAmount();
-
 
                 if (lastAttackStyle == HunllefStyle.MELEE) {
                     hunllefMeleeDamageReceived += hitsplat.getAmount();
@@ -203,28 +269,24 @@ public class GauntletCoachPlugin extends Plugin {
                     System.out.println("Change Prayer, Damage received during incorrect Prayer: " + hitsplat.getAmount());
                     incorrectPrayerHits++;
                 }
-
-                pendingDamageSource = DamageSource.UNKNOWN;
-                pendingDamageTick = -1;
+                pendingHunllefAttackTick = -1;
             }
         }
 
+        //Determines player damage output
         if ((actor instanceof NPC)) {
             NPC npc = (NPC) actor;
-
-            //Test to see NPC ID when hitting creature ~~~~DEBUGGING + INFO GATHERING
-            //System.out.println("Hit NPC ID: " + npc.getId() + " Name: " + npc.getName() + " Amount: " + hitsplat.getAmount() + " isMine: " + hitsplat.isMine());
 
             if (hitsplat.isMine()) {
                 if (HUNLLEF_IDS.contains(npc.getId())) {
                     hunllefDamageDealt += hitsplat.getAmount();
                     gauntletCoachPanel.updateDamage(hunllefDamageDealt);
                     System.out.println("Damage to Hunllef: " + hitsplat.getAmount() + " ~ Total: " + hunllefDamageDealt);
+
                 }
             }
         }
     }
-
 
     //Tracks NPC animation changes
     @Subscribe
@@ -239,36 +301,39 @@ public class GauntletCoachPlugin extends Plugin {
 
         if (animID == hunllefRangedSwitchAnimation) {
             currentHunllefStyle = HunllefStyle.RANGED;
+            expectedPrayerStyle = HunllefStyle.RANGED;
+            hunllefStyleSwapTick = client.getTickCount();
             System.out.println("Hunllef swapped to RANGED");
+            waitingForPrayerCorrection = true;
         } else if (animID == hunllefMageSwitchAnimation) {
             currentHunllefStyle = HunllefStyle.MAGE;
+            expectedPrayerStyle = HunllefStyle.MAGE;
+            hunllefStyleSwapTick = client.getTickCount();
             System.out.println("Hunllef swapped to MAGE");
+            waitingForPrayerCorrection = true;
         } else if (animID == hunllefMeleeAttackAnimation) {
             checkHunllefAttack(HunllefStyle.MELEE);
             System.out.println("Hunllef hit with MELEE");
         } else if (animID == hunllefAttackAnimation) {
             checkHunllefAttack(currentHunllefStyle);
         }
-
-        //Outputs animation change details to terminal ~~~~DEBUGGING + INFO GATHERING
-//        System.out.println(
-//                "NPC Animation: " + npc.getName() +
-//                " AnimID: " + npc.getAnimation()
-//        );
-
     }
-
 
     @Subscribe
     public void onNpcDespawned(NpcDespawned event)
     {
         NPC npc = event.getNpc();
 
+        if(TORNADO_IDS.contains(npc.getId())){
+            activeTornadoes.remove(npc);
+
+            System.out.println("Tornado despawned. Active tornadoes: " + activeTornadoes.size());
+        }
+
         if (HUNLLEF_IDS.contains(npc.getId()) && fightActive)
         {
             int fightEndTick = client.getTickCount();
             int fightDurationTicks = (fightEndTick - fightStartTick);
-
 
             outputResults(fightDurationTicks);
             resetEncounter();
@@ -287,6 +352,7 @@ public class GauntletCoachPlugin extends Plugin {
         int fightDisplaySeconds = fightDurationSeconds % 60;
         double playerDPS = 0.0;
         double percentageOffPrayer = 0.0;
+        double averagePrayerReaction = 0.0;
 
         //Calculates the Players DPS
         if(fightDurationSeconds > 0) {
@@ -296,6 +362,10 @@ public class GauntletCoachPlugin extends Plugin {
 
         if(hunllefDamageReceived > 0) {
             percentageOffPrayer = (double) hunllefDamageReceivedOffPrayer / hunllefDamageReceived * 100;
+        }
+
+        if (prayerSwitchCount > 0){
+        averagePrayerReaction = (double) totalPrayerReactionTicks/prayerSwitchCount;
         }
 
         System.out.println("~~~~~~~~~~~~~~GAUNTLET COMPLETED~~~~~~~~~~~~~~");
@@ -312,6 +382,9 @@ public class GauntletCoachPlugin extends Plugin {
         System.out.println("Total Damage Dealt to Hunllef: " + hunllefDamageDealt);
         System.out.println("Average DPS over the fight " + String.format("%.2f", playerDPS));
 
+        System.out.println("Average Prayer Reaction time: " + String.format("%.2f", averagePrayerReaction) + " ticks");
+        System.out.println("Fastest Prayer Reaction time: " + fastestPrayerReaction + " ticks");
+        System.out.println("Slowest Prayer Reaction time: " + slowestPrayerReaction + " ticks");
 
         System.out.println("Total Damage Dealt To Minions: " + minionDamageDealt);
         System.out.println("Total Damage Received From Minions: " + minionDamageReceived);
@@ -329,6 +402,9 @@ public class GauntletCoachPlugin extends Plugin {
         minionAttackCount = 0;
         minionDamageReceived = 0;
 
+        waitingForPrayerCorrection = false;
+        expectedPrayerStyle = null;
+        hunllefStyleSwapTick = -1;
         hunllefDamageReceivedOnPrayer = 0;
         hunllefDamageReceivedOffPrayer = 0;
 
@@ -336,10 +412,15 @@ public class GauntletCoachPlugin extends Plugin {
         lastAttackStyle = HunllefStyle.RANGED;
         lastAttackOnPrayer = false;
         pendingDamageSource = DamageSource.UNKNOWN;
-        pendingDamageTick = -1;
+        pendingHunllefAttackTick = -1;
         fightActive = false;
         fightStartTick = -1;
         incorrectPrayerHits = 0;
+        totalPrayerReactionTicks = 0;
+        prayerSwitchCount = 0;
+        fastestPrayerReaction = Integer.MAX_VALUE;
+        slowestPrayerReaction = 0;
+        activeTornadoes.clear();
 
         System.out.println("Gauntlet plugin reset");
 
